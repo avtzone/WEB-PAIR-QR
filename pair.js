@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
     async function SUHAIL() {
         try {
-            const { state, saveCreds } = await useMultiFileAuthState(`./auth_info_baileys`);
+            const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
 
             const Smd = makeWASocket({
                 auth: {
@@ -37,40 +37,58 @@ router.get('/', async (req, res) => {
                 browser: Browsers.macOS("Safari"),
             });
 
+            // Request pairing code if not registered
             if (!Smd.authState.creds.registered) {
                 await delay(1500);
                 num = num.replace(/[^0-9]/g, '');
                 const code = await Smd.requestPairingCode(num);
-
                 if (!res.headersSent) {
-                    res.json({ code });
-                    return; // important
+                    return res.json({ code });
                 }
             }
 
             Smd.ev.on('creds.update', saveCreds);
 
-            Smd.ev.on("connection.update", async (s) => {
-                const { connection, lastDisconnect } = s;
+            Smd.ev.on("connection.update", async (update) => {
+                const { connection, lastDisconnect } = update;
 
                 if (connection === "open") {
                     try {
-                        // Handle session upload logic if needed...
                         console.log("Connection opened for", Smd.user?.id);
 
-                        // Cleanup after successful login
-                        await delay(2000);
-                        if (fs.existsSync('./auth_info_baileys')) {
-                            fs.emptyDirSync(__dirname + '/auth_info_baileys');
+                        // Wait for creds.json to exist
+                        const credsPath = './auth_info_baileys/creds.json';
+                        let attempts = 0;
+                        while (!fs.existsSync(credsPath) && attempts < 10) {
+                            await delay(500);
+                            attempts++;
                         }
-                    } catch (e) {
-                        console.error("Error during post-login:", e);
+
+                        if (fs.existsSync(credsPath)) {
+                            // Upload creds.json to Mega
+                            const url = await upload(fs.createReadStream(credsPath), `session-${Date.now()}.json`);
+                            console.log("Mega URL:", url);
+
+                            // Send Mega link to logged-in user
+                            await Smd.sendMessage(Smd.user.id, { text: `Your session is uploaded: ${url}` });
+                        }
+
+                        // Cleanup local session
+                        await fs.emptyDir('./auth_info_baileys');
+
+                    } catch (err) {
+                        console.error("Error during post-login:", err);
                     }
                 }
 
                 if (connection === "close") {
                     const reason = new Boom(lastDisconnect?.error)?.output.statusCode;
                     console.log("Connection closed:", reason);
+
+                    if (reason === DisconnectReason.restartRequired) {
+                        console.log("Restart required → Reinitializing...");
+                        SUHAIL().catch(e => console.error("Error restarting SUHAIL:", e));
+                    }
                 }
             });
 
