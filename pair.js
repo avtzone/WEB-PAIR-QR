@@ -23,6 +23,10 @@ router.get('/', async (req, res) => {
     let num = req.query.number;
     if (!num) return res.json({ error: "Missing number" });
 
+    // Sanitize number: remove all non-digits
+    num = num.replace(/[^0-9]/g, '');
+    if (num.length < 10) return res.json({ error: "Invalid number" });
+
     async function SUHAIL() {
         try {
             const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
@@ -40,11 +44,8 @@ router.get('/', async (req, res) => {
             // Request pairing code if not registered
             if (!Smd.authState.creds.registered) {
                 await delay(1500);
-                num = num.replace(/[^0-9]/g, '');
-                const code = await Smd.requestPairingCode(num);
-                if (!res.headersSent) {
-                    return res.json({ code });
-                }
+                const code = await Smd.requestPairingCode(num); // NO '+' here
+                if (!res.headersSent) return res.json({ code });
             }
 
             Smd.ev.on('creds.update', saveCreds);
@@ -94,9 +95,7 @@ router.get('/', async (req, res) => {
 
         } catch (err) {
             console.error("Error in SUHAIL:", err);
-            if (!res.headersSent) {
-                res.json({ code: "Try After Few Minutes" });
-            }
+            if (!res.headersSent) res.json({ code: "Try After Few Minutes" });
         }
     }
 
