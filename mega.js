@@ -1,8 +1,8 @@
 const mega = require("megajs");
 
 const auth = {
-    email: "nixeb74822@fuasha.com",       // 🔹 replace with valid mega email
-    password: "Viruna12", // 🔹 replace with valid mega password
+    email: "nixeb74822@fuasha.com",       
+    password: "Viruna12", 
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"
 };
 
@@ -21,13 +21,14 @@ const upload = (data, name) => {
         const storage = new mega.Storage(auth, (err) => {
             if (err) return reject(err);
 
-            const uploader = storage.upload({ name });
+            const uploader = storage.upload({
+                name,
+                allowUploadBuffering: true, // ✅ important for buffers/streams
+            });
 
-            // Handle Buffer input
             if (Buffer.isBuffer(data)) {
                 uploader.end(data);
             } else {
-                // Assume it's a readable stream
                 data.pipe(uploader);
             }
 
@@ -38,6 +39,8 @@ const upload = (data, name) => {
                     resolve(url);
                 });
             });
+
+            uploader.on("error", reject);
         });
     });
 };
