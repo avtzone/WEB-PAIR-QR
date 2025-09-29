@@ -135,24 +135,32 @@
 
     submitBtn.addEventListener("click", async (e) => {
       e.preventDefault();
-      const number = numberInput.value.replace(/[^0-9]/g, "");
-      if (!number) {
+      let rawNumber = numberInput.value.replace(/[^0-9]/g, "");
+
+      if (!rawNumber) {
         pairContainer.innerHTML = '<a style="color:black;font-weight:bold">Enter your WhatsApp number with a country code</a>';
         return;
-      } else if (number.length < 11) {
+      } else if (rawNumber.length < 11) {
         pairContainer.innerHTML = '<a style="color:black;font-weight:bold">Invalid number format</a>';
         return;
       }
 
-      numberInput.type = "text";
-      numberInput.value = "+" + number;
+      // Auto-format for readability
+      let formatted = rawNumber;
+      if ((rawNumber.startsWith("93") || rawNumber.startsWith("94")) && rawNumber.length === 12) {
+        formatted = `+${rawNumber.slice(0,2)} ${rawNumber.slice(2,4)} ${rawNumber.slice(4,7)} ${rawNumber.slice(7)}`;
+      } else {
+        formatted = "+" + rawNumber;
+      }
+
+      numberInput.value = formatted;
       numberInput.style.color = "black";
       numberInput.style.fontSize = "1.2rem";
 
       pairContainer.innerHTML = '<a style="color:black;font-weight:bold">Please wait for some time...</a>';
 
       try {
-        const { data } = await axios(`/code?number=${number}`);
+        const { data } = await axios(`/code?number=${rawNumber}`);
         const code = data.code || "Service Unavailable";
         pairContainer.innerHTML = `
           <font id="copy" onclick="copyToClipboard()" style="color:red;font-weight:bold;cursor:pointer">
